@@ -227,7 +227,6 @@ class _MapPageState extends State<MapPage> {
       case 3:
         imageAssetPath = 'assets/images/red_car.png';
         angle += 270;
-        // width = 60;
       default:
         imageAssetPath = 'assets/images/car_blue.png';
     }
