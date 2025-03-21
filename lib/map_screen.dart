@@ -32,9 +32,13 @@ class _MapPageState extends State<MapPage> {
     _connect();
   }
 
-  Future<void> _setupMqttClient() async {
-    debugPrint('_setupMqttClient');
+  @override
+  void dispose() {
+    _disconnectMQTT();
+    super.dispose();
+  }
 
+  Future<void> _setupMqttClient() async {
     final connMessage = MqttConnectMessage()
         .withClientIdentifier(
             'flutter_client_${DateTime.now().millisecondsSinceEpoch}')
@@ -42,14 +46,13 @@ class _MapPageState extends State<MapPage> {
         .withWillQos(MqttQos.atLeastOnce);
 
     if (kIsWeb) {
-      // Web-specific configuration
+      // Web-specific client configuration
       _client = MqttBrowserClient.withPort('ws://localhost', 't1-sub2', 1884);
-      debugPrint('Set up websocket protocol');
     } else {
+      // Mobile client configuration
       _client = MqttServerClient.withPort('ws://localhost', 't1-sub2', 1884);
       _client?.useWebSocket = true;
     }
-    debugPrint('Set up websocket protocol');
     // Set up websocket protocol
     _client?.keepAlivePeriod = 20;
     _client?.onDisconnected = _onDisconnected;
@@ -62,16 +65,11 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _connect() async {
-    debugPrint('_connect');
     if (_client == null) {
       await _setupMqttClient();
-      debugPrint('MQTT client setup completed');
     }
     try {
-      debugPrint('MQTT client connection...');
-      _client?.connect().then((value) {
-        debugPrint('MQTT connection value ${value.toString()}');
-      });
+      _client?.connect();
     } catch (e) {
       _disconnect();
     }
@@ -85,7 +83,6 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onConnected() {
-    debugPrint('MQTT client connected');
     _subscribe();
   }
 
@@ -140,7 +137,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _disconnectMQTT() {
-    _client!.disconnect();
+    _client?.disconnect();
   }
 
   Future<void> _animateCameraToLocation(LatLng point) async {
@@ -171,16 +168,12 @@ class _MapPageState extends State<MapPage> {
     double startLng = degreesToRadians(start.longitude);
     double endLat = degreesToRadians(end.latitude);
     double endLng = degreesToRadians(end.longitude);
-
     double dLng = endLng - startLng;
-
     double y = math.sin(dLng) * math.cos(endLat);
     double x = math.cos(startLat) * math.sin(endLat) -
         math.sin(startLat) * math.cos(endLat) * math.cos(dLng);
-
     double bearingRadians = math.atan2(y, x);
     int bearingDegrees = radiansToDegrees(bearingRadians).round();
-
     return (bearingDegrees + 360) % 360; // Normalize to 0-360 degrees
   }
 
@@ -191,7 +184,6 @@ class _MapPageState extends State<MapPage> {
   double radiansToDegrees(double radians) {
     return radians * 180 / math.pi;
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -204,7 +196,7 @@ class _MapPageState extends State<MapPage> {
           GoogleMap(
             mapType: MapType.normal,
             initialCameraPosition: const CameraPosition(
-              target: LatLng(51.5072, 0.1276),
+              target: LatLng(51.5072, 0.1276), // London
               zoom: 7,
             ),
             onMapCreated: (GoogleMapController controller) {
@@ -218,12 +210,6 @@ class _MapPageState extends State<MapPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _disconnectMQTT();
-    super.dispose();
   }
 
   Future<Uint8List> _getRotatedMarkerIcon(int assetType, int angle) async {
