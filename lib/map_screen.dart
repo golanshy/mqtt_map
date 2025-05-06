@@ -13,11 +13,21 @@ import 'package:mqtt_client/mqtt_browser_client.dart';
 import 'package:mqtt_map/models/data_point.dart';
 
 class MapPage extends StatefulWidget {
+  const MapPage({super.key});
+
   @override
-  _MapPageState createState() => _MapPageState();
+  MapPageState createState() => MapPageState();
 }
 
-class _MapPageState extends State<MapPage> {
+const mqttServer =
+    '9301d53c26cf418c9e3d433fa27b5dff.s1.eu.hivemq.cloud';
+const mqttPort = 8884;
+const clientId = 'tt-controller-mqtt-map';
+const username = 'tt_controller';
+const password = '1Idk*E2Dro%SX7@n8>wV';
+const pubTopic = 'tt_controller/device/raw';
+
+class MapPageState extends State<MapPage> {
   dynamic _client;
   Set<Marker> _markers = {};
   final Map<String, Marker> _markersMap = {};
@@ -45,15 +55,21 @@ class _MapPageState extends State<MapPage> {
         .startClean()
         .withWillQos(MqttQos.atLeastOnce);
 
+    // HiveMQ Web client configuration
     if (kIsWeb) {
-      // Web-specific client configuration
-      _client = MqttBrowserClient.withPort('ws://localhost', 't1-sub2', 1884);
-    } else {
-      // Mobile client configuration
-      _client = MqttServerClient.withPort('ws://localhost', 't1-sub2', 1884);
+      _client = MqttBrowserClient('wss://$mqttServer:$mqttPort/mqtt', clientId,
+          maxConnectionAttempts: 3);
+    }
+
+    // HiveMQ Mobile client configuration
+    if (!kIsWeb) {
+      _client = MqttServerClient('wss://$mqttServer:$mqttPort/mqtt', clientId,
+          maxConnectionAttempts: 3);
       _client?.useWebSocket = true;
     }
+
     // Set up websocket protocol
+    _client.port = mqttPort;
     _client?.keepAlivePeriod = 20;
     _client?.onDisconnected = _onDisconnected;
     _client?.onConnected = _onConnected;
@@ -65,17 +81,19 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _connect() async {
+    debugPrint('MQTT client connect');
     if (_client == null) {
       await _setupMqttClient();
     }
     try {
-      _client?.connect();
+      _client?.connect(username, password);
     } catch (e) {
       _disconnect();
     }
   }
 
   void _disconnect() {
+    debugPrint('MQTT client disconnected');
     if (_client != null &&
         _client?.connectionStatus!.state != MqttConnectionState.disconnected) {
       _client?.disconnect();
@@ -83,6 +101,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onConnected() {
+    debugPrint('MQTT client connected');
     _subscribe();
   }
 
